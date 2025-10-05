@@ -12,78 +12,72 @@ this also end to end test but there are two main differences
 let resolvedData = processJson();
 
 for (const dataSet of resolvedData) { 
+    // const runner = dataSet.email === "one@two.com"? test.only : test; //test only this data
+    // const runner = dataSet.email === "one@two.com"? test.skip : test; //test all data except this one 
 
-const runner = dataSet.email === "one@two.com"? test.only : test; //test only this data
-// const runner = dataSet.email === "one@two.com"? test.skip : test; //test all data except this one 
-
-runner(`end to end test for ${dataSet.email}`, 
-    async ({loginPage, prodPage, payPage, basePage, orderPage, cartPage, thnksPage }) => {
-    //=============== Test Data ===================
+    test(`end to end test for ${dataSet.email}`, 
+        async ({loginPage, prodPage, payPage, basePage, orderPage, cartPage, thnksPage }) => {
     const mail1: string = dataSet.email;
     const pass: string = dataSet.pass;
     const country: string = dataSet.country;
     let searchItems: string[] = dataSet.products;
+    let selectedCountry: string;
+    let orderIds: string[];
 
-    //=============== Login Page ===================
-    //enter credentials and click login
-    await loginPage.goTo();
-    await loginPage.validLogin(mail1, pass);
-    await loginPage.login();
-    //================== Products Page ================
-    await prodPage.waitToLoad();
-    await prodPage.addItemstoCart(searchItems);
-    await prodPage.goToCart();
+    await test.step('Login with valid credentials', async () => {
+        await loginPage.goTo();
+        await loginPage.validLogin(mail1, pass);
+        await loginPage.login();
+    });
 
-    //================== Cart Page ================
-    await cartPage.waitToLoad();
-    //Validate that all items that we ordered are in cart 
-    searchItems = await cartPage.validateList(searchItems);
-    console.log("final list length =>", searchItems.length)
-    expect(searchItems.length).toBe(0);
-    await cartPage.checkout();
+    await test.step('Add products to cart', async () => {
+        await prodPage.waitToLoad();
+        await prodPage.addItemstoCart(searchItems);
+        await prodPage.goToCart();
+    });
 
-    //================== PayPage ================
-    //check email is same as we enterd before
-    const mail2 = await payPage.getMail();
-    expect(mail2 === mail1).toBeTruthy();
+    await test.step('Verify cart contents and proceed to checkout', async () => {
+        await cartPage.waitToLoad();
+        const missingItems = await cartPage.validateList(searchItems);
+        console.log("Missing items count =>", missingItems.length);
+        expect(missingItems.length, 'All ordered items should be present in cart').toBe(0);
+        await cartPage.checkout();
+    });
 
-    //Placing order without selecting country check
-    await payPage.placeOrder();
-    const toastmsg = await basePage.getToastMessage();
-    //check toast msg #toast-container => "Please Enter Full Shipping Information"
-    expect(toastmsg?.includes("Please Enter Full Shipping Information")).toBeTruthy();
+    await test.step('Validate shipping information and place order', async () => {
+        const mail2 = await payPage.getMail();
+        expect(mail2 === mail1).toBeTruthy();
 
-    const country1 = await payPage.selectCountry(country);
-    await payPage.placeOrder(); //Placing order
+        // Verify country selection validation
+        await payPage.placeOrder();
+        const toastmsg = await basePage.getToastMessage();
+        expect(toastmsg?.includes("Please Enter Full Shipping Information")).toBeTruthy();
 
-    //================== Thanks Page ================
-    //wait for next page to load 
-    const message = await thnksPage.waitToLoad();
+        // Complete order with valid country
+        selectedCountry = await payPage.selectCountry(country);
+        await payPage.placeOrder();
+    });
 
-    //Validating success msg
-    expect(message?.includes("Thankyou for the order")).toBeTruthy();
+    await test.step('Verify order confirmation', async () => {
+        const message = await thnksPage.waitToLoad();
+        expect(message?.includes("Thankyou for the order")).toBeTruthy();
+        orderIds = await thnksPage.getIDs();
+        await thnksPage.goToOrders();
+    });
 
-    //get products ids into array 
-    let newIds = await thnksPage.getIDs();
-    //go to orders page
-    await thnksPage.goToOrders();
+    await test.step('Validate order details in order history', async () => {
+        await orderPage.waitToLoad();
+        const idsList = await orderPage.getOrdersIds();
+        const filteredItems = orderIds.filter((orderId: string) =>
+            !idsList.some(s => s?.includes(orderId))
+        );
+        expect(filteredItems.length).toBe(0);
 
-    //================== orders Page ================
-    //wait to load table inside page
-    await orderPage.waitToLoad();
-    const idsList = await orderPage.getOrdersIds();
- 
-    const filteredItems = newIds.filter(newid =>
-        !idsList.some(s => s?.includes(newid))
-    );
-    //check orders are there in orders page 
-    expect(filteredItems.length).toBe(0);
-
-    await orderPage.prodView();
-    const country2 = await orderPage.getCountry();
-    //check country same as entered before
-    expect(country1 === country2).toBeTruthy();
-    console.log("Finish Line");
+        await orderPage.prodView();
+        const country2 = await orderPage.getCountry();
+        expect(selectedCountry === country2).toBeTruthy();
+        console.log("Finish Line");
+    });
     /* */
 });
 }
