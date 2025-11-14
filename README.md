@@ -1,6 +1,6 @@
 # Shopping Automation Framwork
 
-**Playwright Automation Framework in TypeScript** for modern shopping websites. This project delivers comprehensive **UI testing**, **API validation**, and **security checks**, all powered by **data-driven, end-to-end workflows**. Built with scalability and maintainability in mind, Shopwright is fully compatible with **GitHub Actions CI/CD** for seamless automation.
+**Playwright Automation Framework in TypeScript** for modern shopping websites. This project delivers comprehensive **UI testing**, **API validation**, and **security checks**, all powered by **data-driven, end-to-end workflows**. Built with scalability and maintainability in mind, It' is fully compatible with **GitHub Actions CI/CD** for seamless automation.
 
 ---
 
